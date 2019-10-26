@@ -1,10 +1,14 @@
+import java.awt.Dimension;
 import java.awt.Toolkit;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
 import java.awt.image.WritableRaster;
+import java.beans.PropertyVetoException;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -26,15 +30,18 @@ public class MainFrame extends javax.swing.JFrame {
 
     private File file;
     private BufferedImage img;
-    private DemoInternalFrame original;
-    private Map<DemoInternalFrame, Boolean> umbralizadas = new HashMap<>();
+    private InternalFrame original;
+    private Map<InternalFrame, Boolean> umbralizadas = new HashMap<>();
+    private String ext = "jpg";
     
     public MainFrame() {
         initComponents();
+        this.setMinimumSize(new Dimension(500,500));
         this.setLocation(0, 0);
         this.setPreferredSize(Toolkit.getDefaultToolkit().getScreenSize());
         pack();
         this.addWindowListener(onWindowClosing());
+        this.setTitle("Practica 7");
     }
     
     private WindowAdapter onWindowClosing(){
@@ -45,6 +52,17 @@ public class MainFrame extends javax.swing.JFrame {
                 inCloseActionPerformed();
             }
             
+        };
+    }
+    
+    private ComponentAdapter onRezisable(){
+        return new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e){
+                for(JInternalFrame frame : desktop.getAllFrames()){
+                    
+                }
+            }
         };
     }
 
@@ -62,10 +80,11 @@ public class MainFrame extends javax.swing.JFrame {
         jMenuBar1 = new javax.swing.JMenuBar();
         jMenu1 = new javax.swing.JMenu();
         abrirMenuItem = new javax.swing.JMenuItem();
+        GuardarMenuItem = new javax.swing.JMenuItem();
         jMenu2 = new javax.swing.JMenu();
         umbralizarMenuItem = new javax.swing.JMenuItem();
         cerrarMenuItem = new javax.swing.JMenu();
-        jMenuItem3 = new javax.swing.JMenuItem();
+        SalirMenuItem = new javax.swing.JMenuItem();
 
         jMenuItem2.setText("jMenuItem2");
 
@@ -84,7 +103,7 @@ public class MainFrame extends javax.swing.JFrame {
 
         jMenu1.setText("File");
 
-        abrirMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.CTRL_MASK));
+        abrirMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_A, java.awt.event.InputEvent.CTRL_MASK));
         abrirMenuItem.setText("Abrir");
         abrirMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -92,6 +111,15 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
         jMenu1.add(abrirMenuItem);
+
+        GuardarMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.CTRL_MASK));
+        GuardarMenuItem.setText("Guardar");
+        GuardarMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                GuardarMenuItemActionPerformed(evt);
+            }
+        });
+        jMenu1.add(GuardarMenuItem);
 
         jMenuBar1.add(jMenu1);
 
@@ -115,14 +143,14 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
 
-        jMenuItem3.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.CTRL_MASK));
-        jMenuItem3.setText("Salir");
-        jMenuItem3.addActionListener(new java.awt.event.ActionListener() {
+        SalirMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_Q, java.awt.event.InputEvent.CTRL_MASK));
+        SalirMenuItem.setText("Salir");
+        SalirMenuItem.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jMenuItem3ActionPerformed(evt);
+                SalirMenuItemActionPerformed(evt);
             }
         });
-        cerrarMenuItem.add(jMenuItem3);
+        cerrarMenuItem.add(SalirMenuItem);
 
         jMenuBar1.add(cerrarMenuItem);
 
@@ -155,9 +183,11 @@ public class MainFrame extends javax.swing.JFrame {
         }else{
             try {
                 checkImg(abre);
-                original = new DemoInternalFrame("Original", img);
+                InternalFrame.resetOffsetPosition();
+                original = new InternalFrame("Original", img);
                 original.addInternalFrameListener(onOriginalInternalFrameClosing());
-                    desktop.add(original);
+                desktop.add(original);
+                setImgFocus(original);
             }catch(Exception e){
                 JOptionPane.showMessageDialog(this, "Error interno");
             }
@@ -190,14 +220,17 @@ public class MainFrame extends javax.swing.JFrame {
                    onOrinalClose();
                    original.dispose();
                    img = null;
+                }else{
+                    original.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
                 }
             }
         };
     }
     
+    
+    
     private void onOrinalClose(){
         if (umbralizadas.isEmpty()) return;
-        
         String ObjButtons[] = {"Si","No"};        
         int response =  JOptionPane.showOptionDialog(desktop,"Desea Cerrar las imagenes umbralizadas?","Cerrar",JOptionPane.DEFAULT_OPTION,JOptionPane.WARNING_MESSAGE,null,ObjButtons,ObjButtons[1]);
         if (response == JOptionPane.YES_OPTION){
@@ -207,7 +240,7 @@ public class MainFrame extends javax.swing.JFrame {
     
     
     private void closeUmbralizedInternalFrames(){
-        for (DemoInternalFrame e: umbralizadas.keySet()){
+        for (InternalFrame e: umbralizadas.keySet()){
             e.dispose();
         }
         umbralizadas.clear();
@@ -228,7 +261,7 @@ public class MainFrame extends javax.swing.JFrame {
         String input = JOptionPane.showInputDialog(this,"Introduzca un entero",
                                                         "Aplicar Umbral",
                                                          JOptionPane.QUESTION_MESSAGE);
-        if ((input != null) && (input.length() > 0)) {
+        if ((input == null) && (input.length() <= 0)) {
             return;
         }
         
@@ -237,22 +270,17 @@ public class MainFrame extends javax.swing.JFrame {
             if (value < 0 ||value > 255) {
                 throw new Exception("El umbral debe estar entre 0 y 255");
             }
-            //BufferedImage imgUmbralizada = ImgUmbralizer.umbralizar(ImageIO.read(file), value);
-            BufferedImage imgUmbralizada = deepCopy(img);
-            DemoInternalFrame demo = new DemoInternalFrame("Umbral: " + value, imgUmbralizada);
+            BufferedImage imgUmbralizada = ImgUmbralizer.umbralizar(ImageIO.read(file), value);
+            InternalFrame demo = new InternalFrame("Umbral: " + value, imgUmbralizada);
             umbralizadas.put(demo, false);
             desktop.add(demo);
+            demo.addInternalFrameListener(onUmbralizedInternalFrameClosing());
+            setImgFocus(demo);
         }catch(Exception e){
             JOptionPane.showMessageDialog(this, "Introduzca solo valores enteros entre 0 y 255");
         }
     }//GEN-LAST:event_umbralizarMenuItemActionPerformed
-    
-    static BufferedImage deepCopy(BufferedImage bi) {
-        ColorModel cm = bi.getColorModel();
-        boolean isAlphaPremultiplied = cm.isAlphaPremultiplied();
-        WritableRaster raster = bi.copyData(null);
-        return new BufferedImage(cm, raster, isAlphaPremultiplied, null);
-    }
+
     
     private InternalFrameAdapter onUmbralizedInternalFrameClosing(){
         return new InternalFrameAdapter() {
@@ -260,33 +288,100 @@ public class MainFrame extends javax.swing.JFrame {
             @Override
             public void internalFrameClosing(InternalFrameEvent evt){
                 String ObjButtons[] = {"Si","No"};
-                int PromptResult = JOptionPane.showOptionDialog(desktop,"Quiere Cerrar la Imagen Umbralizada?","Cerrar",JOptionPane.DEFAULT_OPTION,JOptionPane.WARNING_MESSAGE,null,ObjButtons,ObjButtons[1]);
+                int PromptResult = JOptionPane.showOptionDialog(desktop,"Quiere guardar esta imagen?","Cerrar",JOptionPane.DEFAULT_OPTION,JOptionPane.WARNING_MESSAGE,null,ObjButtons,ObjButtons[1]);
+                InternalFrame active = (InternalFrame)evt.getInternalFrame();
                 if(PromptResult==JOptionPane.YES_OPTION){
-                    DemoInternalFrame active = (DemoInternalFrame)evt.getInternalFrame();
-                    askForUmbralizedSave(active);
-                    active.dispose();
+                    saveUmbralizedImg(active);
+                    
+                }else if(PromptResult==JOptionPane.NO_OPTION){
+                    removeFromDesktop(active);
+                }else{
+                    active.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
                 }
             }
         };
     }
     
     
-    private void askForUmbralizedSave(DemoInternalFrame iframe){
-        if (isSaved(iframe)) return;
-        String ObjButtons[] = {"Si","No"};
-        int PromptResult = JOptionPane.showOptionDialog(desktop,"Desea guardar la imagen antes de cerrar?","Cerrar",JOptionPane.DEFAULT_OPTION,JOptionPane.WARNING_MESSAGE,null,ObjButtons,ObjButtons[1]);
-        if(PromptResult==JOptionPane.YES_OPTION){
-            //TODO: guardar imagen
-        }
+    private void saveUmbralizedImg(InternalFrame iframe){
+        BufferedImage img= iframe.getImg();
+        JFileChooser fileChoser = new JFileChooser();
+        FileNameExtensionFilter filter = new FileNameExtensionFilter("Imagenes", "jpg", "jpeg", "png");
+        fileChoser.setFileFilter(filter);
+        fileChoser.setAcceptAllFileFilterUsed(false);
+        int result = fileChoser.showSaveDialog(this);
+        
+        if(result == JFileChooser.APPROVE_OPTION)saveImage(fileChoser.getSelectedFile(),img);
     }
     
-    private boolean isSaved(DemoInternalFrame iframe){
+    
+    private void saveImage(File file, BufferedImage img){
+        String absolutePath = file.getAbsolutePath();
+        String filePath = null;
+        if (file.isDirectory()){
+            warningItIsDirectory();
+        }else if (fileExist(file) && askForFileReplacement() ){   
+            filePath = absolutePath;
+        }else {
+            filePath = getFileNameWithoutExtension(file) + "." + ext;
+        }
+        if (filePath == null) return;
+        
+        File saveFile =  new File(filePath);
+        try {
+            ImageIO.write(img, ext, saveFile);
+            JOptionPane.showMessageDialog(this, "Imagen Guardada correctamente");
+            removeFromDesktop((InternalFrame)desktop.getSelectedFrame());
+        }catch(Exception e){
+            System.out.println(e);
+            JOptionPane.showMessageDialog(this, "Ha ocurrido un error al guardar la imagen",
+                                          "Error", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+    public void warningItIsDirectory(){
+        JOptionPane.showMessageDialog(this, "Especifique un nombre de fichero", "Error", JOptionPane.ERROR_MESSAGE);
+    }
+    
+    private boolean askForFileReplacement(){
+        int respinse = JOptionPane.showConfirmDialog(this, "El fichero exite, desea remplarlo?",
+                                          "Existe firecho con mismo nombre",
+                                          JOptionPane.OK_CANCEL_OPTION);
+        return (respinse == JOptionPane.OK_OPTION);
+    }
+    
+    private void removeFromDesktop(InternalFrame frame){
+        umbralizadas.remove(frame);
+        frame.dispose();
+    }
+    
+    private boolean fileExist(File file){
+        String path = file.getAbsolutePath();
+        String pathWithExtension = path + "." + ext;
+        return new File(path).exists() || new File(pathWithExtension).exists();
+    }
+    
+    private String getFileNameWithoutExtension(File file){
+        String fileName = file.getAbsolutePath();
+        int extensionIndex = fileName.lastIndexOf(".");
+        if (extensionIndex != -1){
+            fileName = fileName.substring(0, extensionIndex);
+        }
+        return fileName;
+    }
+    
+    
+    private boolean isSaved(InternalFrame iframe){
         return umbralizadas.get(iframe);
     }
     
-    private void jMenuItem3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem3ActionPerformed
+    private void SalirMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_SalirMenuItemActionPerformed
         inCloseActionPerformed();
-    }//GEN-LAST:event_jMenuItem3ActionPerformed
+    }//GEN-LAST:event_SalirMenuItemActionPerformed
+
+    private void GuardarMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_GuardarMenuItemActionPerformed
+        InternalFrame active = (InternalFrame)desktop.getSelectedFrame();
+        saveUmbralizedImg(active);
+    }//GEN-LAST:event_GuardarMenuItemActionPerformed
     
     
     private void inCloseActionPerformed(){
@@ -294,7 +389,6 @@ public class MainFrame extends javax.swing.JFrame {
         int PromptResult = JOptionPane.showOptionDialog(this,"Seguro que quieres salir","Salir",JOptionPane.DEFAULT_OPTION,JOptionPane.WARNING_MESSAGE,null,ObjButtons,ObjButtons[1]);
         if(PromptResult==JOptionPane.YES_OPTION)
         {
-            JOptionPane.showMessageDialog(this, "Hasta Pronto !!");
             System.exit(0);
         }else {
             this.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
@@ -338,6 +432,8 @@ public class MainFrame extends javax.swing.JFrame {
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JMenuItem GuardarMenuItem;
+    private javax.swing.JMenuItem SalirMenuItem;
     private javax.swing.JMenuItem abrirMenuItem;
     private javax.swing.JMenu cerrarMenuItem;
     private javax.swing.JDesktopPane desktop;
@@ -345,39 +441,14 @@ public class MainFrame extends javax.swing.JFrame {
     private javax.swing.JMenu jMenu2;
     private javax.swing.JMenuBar jMenuBar1;
     private javax.swing.JMenuItem jMenuItem2;
-    private javax.swing.JMenuItem jMenuItem3;
     private javax.swing.JMenuItem umbralizarMenuItem;
     // End of variables declaration//GEN-END:variables
-}
 
-class DemoInternalFrame extends JInternalFrame {
-
-    //Contador estático que aumenta cada vez que instanciamos una ventana.
-    static int openFrameCount = 1;
-    //Posición de la ventana interna.
-    static final int xOffset = 50, yOffset = 50;
-    static int posX = 0, posY = 0;
-
-    private BufferedImage img;
-
-    public DemoInternalFrame(String titulo, BufferedImage imagen){
-        super(titulo,
-                true, //Resizable
-                true, //Closable
-                true, //Maximizable
-                true);//Iconifiable
-        openFrameCount++;   
-        img = imagen;
-        setVisible(true);
-        //Ponemos la localición de la ventana.
-        setLocation(posX, posY);
-        posX = xOffset * openFrameCount;
-        posY = yOffset * openFrameCount;
-        
-        
-        ImgHolder panel = new ImgHolder();
-        panel.setImage(img);
-        add(panel);
-        pack();        
+    private void setImgFocus(InternalFrame iFrame) {
+        try{
+            iFrame.setSelected(true);
+        }catch(PropertyVetoException e){
+            System.out.println(e);
+        }    
     }
 }
