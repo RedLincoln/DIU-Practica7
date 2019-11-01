@@ -176,11 +176,11 @@ public class MainFrame extends javax.swing.JFrame {
         FileNameExtensionFilter filter = new FileNameExtensionFilter("Imagenes", "jpg", "jpeg", "png");
         fileChoser.setFileFilter(filter);
         fileChoser.setAcceptAllFileFilterUsed(false);
-        fileChoser.showOpenDialog(this);
+        int resultado = fileChoser.showOpenDialog(this);
         File abre = fileChoser.getSelectedFile();
         if (abre!= null && !abre.exists()){
             JOptionPane.showMessageDialog(this, "El fichero " + abre.getAbsolutePath() + " no existe." );
-        }else{
+        }else if(resultado == JFileChooser.APPROVE_OPTION){
             try {
                 checkImg(abre);
                 InternalFrame.resetOffsetPosition();
@@ -188,9 +188,7 @@ public class MainFrame extends javax.swing.JFrame {
                 original.addInternalFrameListener(onOriginalInternalFrameClosing());
                 desktop.add(original);
                 setImgFocus(original);
-            }catch(Exception e){
-                JOptionPane.showMessageDialog(this, "Error interno");
-            }
+            }catch(Exception e){System.out.println(e);}
                 
         }
     }//GEN-LAST:event_abrirMenuItemActionPerformed
@@ -271,7 +269,7 @@ public class MainFrame extends javax.swing.JFrame {
                 throw new Exception("El umbral debe estar entre 0 y 255");
             }
             BufferedImage imgUmbralizada = ImgUmbralizer.umbralizar(ImageIO.read(file), value);
-            InternalFrame demo = new InternalFrame("Umbral: " + value, imgUmbralizada);
+            InternalFrame demo = new InternalFrame("* Umbral: " + value, imgUmbralizada);
             umbralizadas.put(demo, false);
             desktop.add(demo);
             demo.addInternalFrameListener(onUmbralizedInternalFrameClosing());
@@ -287,17 +285,18 @@ public class MainFrame extends javax.swing.JFrame {
             
             @Override
             public void internalFrameClosing(InternalFrameEvent evt){
+                InternalFrame active = (InternalFrame)evt.getInternalFrame();
+                if(isSaved(active)){
+                    removeFromDesktop(active);
+                    return;
+                }
                 String ObjButtons[] = {"Si","No"};
                 int PromptResult = JOptionPane.showOptionDialog(desktop,"Quiere guardar esta imagen?","Cerrar",JOptionPane.DEFAULT_OPTION,JOptionPane.WARNING_MESSAGE,null,ObjButtons,ObjButtons[1]);
-                InternalFrame active = (InternalFrame)evt.getInternalFrame();
-                if(PromptResult==JOptionPane.YES_OPTION){
-                    saveUmbralizedImg(active);
-                    
-                }else if(PromptResult==JOptionPane.NO_OPTION){
-                    removeFromDesktop(active);
-                }else{
-                    active.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-                }
+                
+                if(PromptResult==JOptionPane.YES_OPTION) saveUmbralizedImg(active);
+                if(isSaved(active)|| PromptResult==JOptionPane.NO_OPTION) removeFromDesktop(active);
+                
+                active.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
             }
         };
     }
@@ -310,7 +309,7 @@ public class MainFrame extends javax.swing.JFrame {
         fileChoser.setFileFilter(filter);
         fileChoser.setAcceptAllFileFilterUsed(false);
         int result = fileChoser.showSaveDialog(this);
-        
+        if(result == JFileChooser.CANCEL_OPTION)return;
         if(result == JFileChooser.APPROVE_OPTION)saveImage(fileChoser.getSelectedFile(),img);
     }
     
@@ -331,7 +330,7 @@ public class MainFrame extends javax.swing.JFrame {
         try {
             ImageIO.write(img, ext, saveFile);
             JOptionPane.showMessageDialog(this, "Imagen Guardada correctamente");
-            removeFromDesktop((InternalFrame)desktop.getSelectedFrame());
+            umbralizadas.put((InternalFrame)desktop.getSelectedFrame(), true);
         }catch(Exception e){
             System.out.println(e);
             JOptionPane.showMessageDialog(this, "Ha ocurrido un error al guardar la imagen",
@@ -379,14 +378,23 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_SalirMenuItemActionPerformed
 
     private void GuardarMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_GuardarMenuItemActionPerformed
+        if(original.isSelected())return;
         InternalFrame active = (InternalFrame)desktop.getSelectedFrame();
         saveUmbralizedImg(active);
+        if(isSaved(active)) active.setTitle(active.getTitle().substring(2));
+        
     }//GEN-LAST:event_GuardarMenuItemActionPerformed
     
     
     private void inCloseActionPerformed(){
+        String msn="Seguro que quieres salir";
         String ObjButtons[] = {"Si","No"};
-        int PromptResult = JOptionPane.showOptionDialog(this,"Seguro que quieres salir","Salir",JOptionPane.DEFAULT_OPTION,JOptionPane.WARNING_MESSAGE,null,ObjButtons,ObjButtons[1]);
+        if(umbralizadas.containsValue(false)){
+            msn="Quedan imagenes umbralizadas por guardar, ¿desea salir?";
+            ObjButtons = new String[]{"Salir de todas formas","No"};
+        }
+        
+        int PromptResult = JOptionPane.showOptionDialog(this,msn,"Salir",JOptionPane.DEFAULT_OPTION,JOptionPane.WARNING_MESSAGE,null,ObjButtons,ObjButtons[1]);
         if(PromptResult==JOptionPane.YES_OPTION)
         {
             System.exit(0);
